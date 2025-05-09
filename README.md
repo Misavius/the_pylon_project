@@ -1,193 +1,195 @@
-# versusai-sc2-bot-template
+**Useful Links**
 
-Use this template to start a new Starcraft 2 bot using the [python-sc2](https://github.com/BurnySc2/python-sc2) framework.  
-Then, if you need, follow the tutorial below.  
+[ares-sc2 framework repo](https://github.com/AresSC2/ares-sc2)  
+[ares-sc2 documentation](https://aressc2.github.io/ares-sc2/index.html)
 
-# Tutorial: Starting a python-sc2 bot
+---
+# Installation
 
-## Preparing your environment
-
-First you will need to prepare your environment.
+If you're looking to build your own StarCraft II bot, starting with the `ares-sc2-bot-template` let's you get up and running quickly. This template uses the  Ares-sc2 framework which builds upon the python-sc2 framework, enhancing its capabilities for bot development in StarCraft II. You can find it [here](https://aressc2.github.io/ares-sc2/index.html). 
 
 ### Prerequisites
 
-##### Python
+Before proceeding, ensure the following prerequisites are installed:
 
-This tutorial recommends you use Python version 3.8.X.
-However, newer Python versions should also work with this tutorial.
-[Python downloads page](https://www.python.org/downloads/)
+- [Python 3.11](https://www.python.org/downloads/release/python-3110/)
+- [Poetry](https://python-poetry.org/) 
+- [Git](https://git-scm.com/)
+- [Starcraft 2](https://starcraft2.com/en-gb/) 
+- [Maps](https://aiarena.net/wiki/maps/) Ensure maps are moved to the correct folder as suggested in this wiki.
 
-##### Git
 
-This tutorial will use git for version control.  
-[Git downloads page](https://git-scm.com/downloads)
+**Additional:**
 
-##### Starcraft 2
+*Linux:*  can either download the SC2 Linux package [here](https://github.com/Blizzard/s2client-proto#linux-packages)  from Blizzard or, alternatively, set up Battle.net via WINE using this [lutris script](https://lutris.net/games/battlenet/). 
 
-On Windows SC2 is installed through the Battle.net app.  
-Linux users can either download the Blizzard SC2 Linux package [here](https://github.com/Blizzard/s2client-proto#linux-packages) or, alternatively, set up Battle.net via WINE using this [lutris script](https://lutris.net/games/battlenet/).
+ [PyCharm IDE](https://www.jetbrains.com/pycharm/) - This tutorial will demonstrate how to set up a bot development environment using PyCharm but you can use any IDE.
 
-SC2 should be installed in the default location. Otherwise (and for Linux) you might need to create the SC2PATH environment variable to point to the SC2 install location.
-
+The maps must be copied into the **root** of the Starcraft 2 maps folder - default location: `C:\Program Files (x86)\StarCraft II\Maps`.
 ## Environment Setup for Linux (Lutris)
 
-If you've installed StarCraft II using Lutris on Linux, you'll need to set some environment variables so that the `python-sc2` library can correctly interact with the game.
+If you've installed StarCraft II using Lutris on Linux, you'll need to set some environment variables so that the `ares-sc2` library can correctly interact with the game.
 
 ### Setting Environment Variables Temporarily
 
-Open a terminal and enter the following commands, replacing `(username)` with your actual Linux username and `(version of wine)` with the version of Wine that Lutris is using:
+Open a terminal and enter the following commands, replacing `(username)` with your actual Linux username and `(version of wine)` with the version of Wine that Lutris is using:
 
-```bash
+```shell
 export SC2PF=WineLinux
 export SC2PATH="/home/`(username)`/Games/battlenet/drive_c/Program Files (x86)/StarCraft II/"
 export WINE="/home/`(username)`/.local/share/lutris/runners/wine/`(version of wine)`/bin/wine" 
 ```
 
-##### Starcraft 2 Maps
 
-Download the Starcraft 2 Maps from [here](https://github.com/Blizzard/s2client-proto#map-packs).   For this tutorial you will at least need the 'Melee' pack.  
-The maps must be copied into the **root** of the Starcraft 2 maps folder - default location: `C:\Program Files (x86)\StarCraft II\Maps`.
+# Creating Your Bot
 
-## Creating your bot
-### Setup
-Click the green `Use this template` button above to create your own copy of this bot.  
-Now clone your new repository to your local computer using git:
+- Visit the [starter-bot repo](https://github.com/AresSC2/ares-sc2-starter-bot) and click the `Use this template` button to create your own repository based on this template. The repository can be either public or private.
+    
+- Next, clone the repository locally to your system, ensuring you include the `--recursive` flag:
+    
 ```bash
-git clone <your_git_clone_repo_url_here>
+git clone --recursive <your_git_repo_home_url_here>
 ```
-cd into your bot directory:
+
+- Open a terminal or console window.
+    
+- Navigate to the root of your bot's directory:
+
 ```bash
-cd <bot_folder_name_here>
+cd <bot_folder>
 ```
-Create and activate a virtual environment:
+
+- Install dependencies, compile Cython, and create a new isolated virtual environment:
+
 ```bash
-python -m venv venv
-# and then...
-venv\Scripts\activate # Windows CMD Prompt / PowerShell
-source venv/bin/activate # Mac OS / Linux
+poetry install
 ```
-Install our bot's Python requirements:
+
+### Testing Your Bot:
+
+If you have a non-standard StarCraft 2 installation or are using Linux, please adjust `MAPS_PATH` in `run.py`.
+
+Optionally set your bot name and race in `config.yml`
+
 ```bash
-pip install -r requirements.txt
+poetry run python run.py
 ```
-Test our bot is working by running it:
+
+## Start Developing Your Bot
+
+If everything has worked thus far, open up `bot/main.py` and delve into the excitement of bot development!
+
+An `ares-sc2` bot is a [python-sc2](https://github.com/BurnySc2/python-sc2) bot by default, meaning any examples or documentation from that repository equally relevant here.
+
+## Uploading to [AI Arena](https://www.aiarena.net/)
+
+### Generating a ladder zip
+Included in the repository is a convenient script named `scripts/create_ladder_zip.py`. 
+However, it is important to note that the AI Arena ladder infrastructure operates specifically 
+on Linux-based systems. Due to the dependency of ares-sc2 on cython, it is necessary to execute 
+this script on a Linux environment in order to generate Linux binaries.
+
+To streamline this process, a GitHub workflow has been integrated into this repository when
+pushing to `main` on your GitHub repository (if you previously created a template
+from the [starter-bot](https://github.com/AresSC2/ares-sc2-starter-bot)). 
+Upon each push to the main branch, the `create_ladder_zip.py` script is automatically
+executed on a Debian-based system. As a result, a compressed artifact 
+named `ladder-zip.zip` is generated, facilitating the subsequent upload to AI Arena. 
+To access the generated file, navigate to the Actions tab, click on an Action and refer to the 
+Artifacts section. Please note this may take a few minutes after pusing to the `main` branch.
+
+Ladder zips can also be built on a debian based OS, with docker or via WSL.
+
+### Upload to AI Arena
+The GitHub workflow includes an optional step to automatically upload the ladder-zip.zip artifact from 
+the previous step to the [AI Arena ladder](https://www.aiarena.net/). This feature is disabled by default. 
+To enable it, follow these steps:
+
+1. Set `AutoUploadToAiarena: True` in `config.yml`.
+2. Visit the AI Arena ladder and create an account if you don't have one.
+3. If necessary, set up a new bot via the AI Arena website.
+4. Navigate to your bot's profile and note your bot ID, which can be found in the URL.
+5. Go to `Profile -> View API Token` and save the token string.
+6. In your bot's GitHub repository, navigate to `Settings -> Secrets and variables -> Actions`.
+7. Create two new secrets with the following exact names, using the api token and bot id from earlier:
+
+UPLOAD_API_TOKEN: <aiarena_api_token> <br />
+UPLOAD_BOT_ID: <bot_id>
+
+After completing these steps, the next push to the main branch will build the ladder zip artifact 
+and automatically upload it to AI Arena. You can customize this workflow as needed.
+
+---
+# Additional
+## PyCharm
+
+#### Adding `poetry` environment
+
+Find the path of the environment `poetry` created in the installation step previously, copy and paste or save this path somewhere.
+
+`poetry env list --full-path`
+
+Open this project in PyCharm and navigate to:
+
+File | Settings | Project: | Python Interpreter
+
+- Click `Add Interpreter`, then `Add Local Interpreter`
+
+![Alt text](https://aressc2.github.io/ares-sc2/tutorials/img/img1.png "a title")
+
+- Select `Poetry Environment`, and choose `Existing Environment`
+- Navigate to the path of the poetry environment from the terminal earlier, and select `Scripts/python.exe`
+
+![Alt text](https://aressc2.github.io/ares-sc2/tutorials/img/img2.png "a title")
+
+Now when opening terminal in PyCharm, the environment will already be active. New run configurations can be setup, and they will already be configured to use this environment.
+
+#### Marking sources root
+
+For PyCharm intellisense to work correctly: - Right-click `ares-sc2/src` -> Mark Directory as -> Sources Root
+
+![Alt text](https://aressc2.github.io/ares-sc2/tutorials/img/img3.png "a title")
+
+## Installing Poetry on Linux
+
+To get Poetry to run on some Linux distros you may need to perform the following
+
 ```bash
-python ./run.py
+python3 --version
 ```
-If all is well, you should see SC2 load and your bot start mining minerals.  
-You can close the SC2 window to stop your bot running. 
+to check your version of python, it should show 3.10.12 then 
 
-## Updating your bot
-
-### Bot name and race
-
-Now you will want to name your bot and select its race.
-You can specify both of these in the [bot/bot.py](bot/bot.py) file, in the `CompetitiveBot` class.
-
-### Adding new code
-
-As you add features to your bot make sure all your new code files are in the `bot` folder. This folder is included when creating the ladder.zip for upload to the bot ladders.
-
-## Upgrading to Ares Framework
-
-Ares-sc2 is a library that extends python-sc2, offering advanced tools and functionalities to give you greater control over your bot's strategic decisions. If you want more sophisticated and nuanced gameplay tactics, upgrading to Ares-sc2 is the way to go.
-
-### Running the Upgrade Script
-
-Run the following command:
 ```bash
-python upgrade_to_ares.py
+curl -sSL https://install.python-poetry.org | python3 -
+```
+to install poetry
+
+```bash
+poetry --version
+```
+to verify you have poetry installed
+
+## Update `ares-sc2`
+
+This may take a minute or two
+
+`python scripts/update_ares.py`
+
+## Format code
+
+`black .`
+
+`isort .`
+
+# FAQ
+
+I got the Following Error `Directory .../ares-sc2-bot-template/ares-sc2 for ares-sc2 does not seem to be a Python package`
+
+a: This means you're missing the ares-sc2 sub module 
+```bash
+git submodule update --init
+git submodule update --init --recursive --remote
 ```
 
-### Code Changes
-
-#### Updating the Bot Object
-
-The main bot object should inherit from `ares-sc2` instead of `python-sc2`.
-
-**python-sc2:**
-```python
-from sc2.bot_ai import BotAI
-
-class MyBot(BotAI):
-    pass
-```
-
-**ares-sc2:**
-```python
-from ares import AresBot
-
-class MyBot(AresBot):
-    pass
-```
-
-#### Adding Super Calls to Hook Methods
-
-For any `python-sc2` hook methods you use, add a `super` call. Only convert the hooks you actually use.
-
-**python-sc2:**
-```python
-class MyBot(AresBot):
-    async def on_step(self, iteration: int) -> None:
-        pass
-
-    async def on_start(self, iteration: int) -> None:
-        pass
-
-    async def on_end(self, game_result: Result) -> None:
-        pass
-
-    async def on_building_construction_complete(self, unit: Unit) -> None:
-        pass
-
-    async def on_unit_created(self, unit: Unit) -> None:
-        pass
-
-    async def on_unit_destroyed(self, unit_tag: int) -> None:
-        pass
-
-    async def on_unit_took_damage(self, unit: Unit, amount_damage_taken: float) -> None:
-        pass
-```
-
-**ares-sc2:**
-```python
-class MyBot(AresBot):
-    async def on_step(self, iteration: int) -> None:
-        await super(MyBot, self).on_step(iteration)
-        # on_step logic here ...
-
-    async def on_start(self, iteration: int) -> None:
-        await super(MyBot, self).on_start(iteration)
-        # on_start logic here ...
-
-    async def on_end(self, game_result: Result) -> None:
-        await super(MyBot, self).on_end(game_result)
-        # custom on_end logic here ...
-
-    async def on_building_construction_complete(self, unit: Unit) -> None:
-        await super(MyBot, self).on_building_construction_complete(unit)
-        # custom on_building_construction_complete logic here ...
-
-    async def on_unit_created(self, unit: Unit) -> None:
-        await super(MyBot, self).on_unit_created(unit)
-        # custom on_unit_created logic here ...
-
-    async def on_unit_destroyed(self, unit_tag: int) -> None:
-        await super(MyBot, self).on_unit_destroyed(unit_tag)
-        # custom on_unit_destroyed logic here ...
-
-    async def on_unit_took_damage(self, unit: Unit, amount_damage_taken: float) -> None:
-        await super(MyBot, self).on_unit_took_damage(unit, amount_damage_taken)
-        # custom on_unit_took_damage logic here ...
-```
-
-## Competing with your bot
-
-To compete with your bot, you will first need zip up your bot, ready for distribution.   
-You can do this using the `create_ladder_zip.py` script like so:
-```
-python create_ladder_zip.py
-```
-This will create the zip file`publish\bot.zip`.
-You can then distribute this zip file to competitions.
+--- 
+***Interested in contributing*** to `ares-sc2`? Take a look at setting up a local dev environment [here instead.](https://aressc2.github.io/ares-sc2/contributing/index.html)
