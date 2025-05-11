@@ -1,0 +1,68 @@
+# This file is optional and here as an example of how to activate the build runner
+# FEEL FREE TO DELETE!!
+
+# If playing as a different race, make a file similar to this but change filename:
+# `zerg_builds.yml` or `terran_builds.yml`
+
+
+# Save the game opening and result to disk?
+# Setting to `True` allows Ares to select a new opening after defeat
+UseData: True
+# How should we choose a build?
+# Use `Cycle` for a simple build cycle on defeat
+# Use `WinrateBased` to use winrates to select a build
+BuildSelection: WinrateBased
+# For each Race / Opponent ID choose a build selection
+BuildChoices:
+    # test_123 is active if Debug: True (set via a `config.yml` file)
+    test_123:
+        BotName: Test
+        Cycle:
+            - hard_tank_contain
+
+    Protoss:
+        BotName: ProtossRace
+        Cycle:
+            - hard_tank_contain
+
+    Random:
+        BotName: RandomRace
+        Cycle:
+            - hard_tank_contain
+
+    Terran:
+        BotName: TerranRace
+        Cycle:
+            - hard_tank_contain
+
+    Zerg:
+        BotName: ZergRace
+        Cycle:
+            - hard_tank_contain
+
+    # Can also use specific opponent ids (overrides race options above)
+    a_bot_opponent_id_from_aiarena:
+        BotName: QueenBot
+        Cycle:
+            - hard_tank_contain
+
+Builds:
+    hard_tank_contain:
+        # Build constant workers till x supply
+        ConstantWorkerProductionTill: 24
+        OpeningBuildOrder:
+            # Example: ['12 worker', '13 worker', '14 supply', '14 worker', '15 chrono @ nexus',
+            #           '15 worker', '16 gateway']
+            # ['12 worker', '13 worker', '13 supply', '14 worker', '15 barracks',
+            #     '15 worker', '16 bunker @ ENEMY_NAT_VISION', '16 worker', '16 refinery', '17 worker', '17 orbital',
+            #     '18 worker', '19 worker', '19 factory', '20 worker', '20 supply', '21 worker', '22 factorytechlab',
+            #     '22 worker', '23 worker', '24 worker', '25 siegetank']
+            # ['12 barracks @ enemy_third', '13 supply @ ramp', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
+            #     '17 factory', '17 orbital', '17 marine', '17 supply', '19 marine', '20 factorytechlab',  '21 marine',
+            #     '25 siegetank']
+            ['13 supply @ ramp', '13 barracks @ enemy_third', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
+                '17 factory', '17 orbital', '17 marine', '17 supply', '19 marine', '20 factorytechlab',  '21 marine',
+                '25 siegetank']
+            
+
+
