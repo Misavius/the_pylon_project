@@ -178,7 +178,11 @@ class ManagerMediator(IManagerMediator):
 
 
         """
-        logger.info("Inside build with specific worker")
+        # logger.info(f"INSIDE THE BUILD_WITH_SPECIFIC_WORKER {not kwargs["pos"] or not kwargs["worker"]}")
+        logger.info(f"worker tag {kwargs["worker"].tag}")
+        # logger.info(f"tag not in dict: {kwargs["worker"].tag in self.get_building_tracker_dict}")
+        # if not pos or not worker:
+        #     return False
         return self.manager_request(
             ManagerName.BUILDING_MANAGER,
             ManagerRequestType.BUILD_WITH_SPECIFIC_WORKER,

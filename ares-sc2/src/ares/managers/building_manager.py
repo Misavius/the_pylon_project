@@ -48,6 +48,8 @@ from ares.managers.manager_mediator import IManagerMediator, ManagerMediator
 if TYPE_CHECKING:
     from ares import AresBot
 
+from loguru import logger
+
 
 class BuildingManager(Manager, IManagerMediator):
     """Handle the construction of buildings.

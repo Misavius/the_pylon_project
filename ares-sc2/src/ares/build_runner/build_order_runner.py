@@ -100,6 +100,10 @@ class BuildOrderRunner:
         self.current_build_position: Point2 = self.ai.start_location
         self.assigned_persistent_worker: bool = False
 
+        self.performing_tmp_step: bool = False
+        self.tmp_step_started: bool = False
+        self.tmp_step_completed: bool = False
+
         self._temporary_build_step: int = -1
         self.should_handle_gas_steal: bool = True
         self._geyser_tag_to_probe_tag: dict[int, int] = dict()
@@ -207,7 +211,8 @@ class BuildOrderRunner:
         """
         Can look ahead in the build order?
         """
-        return self.ai.minerals > 75 and self._temporary_build_step == -1
+        return (self.ai.minerals > 75 and self._temporary_build_step == -1 
+                and not self.performing_tmp_step)
 
     async def run_build(self) -> None:
         """
@@ -224,13 +229,14 @@ class BuildOrderRunner:
 
             if self._temporary_build_step != -1:
                 logger.info("inside the temp build section")
-                await self.do_step(self.build_order[self._temporary_build_step])
+                await self.do_step(self.build_order[self._temporary_build_step], True)
             else:
-                await self.do_step(self.build_order[self.build_step])
+                await self.do_step(self.build_order[self.build_step], False)
 
             # if we are a bit stuck on current step, we can look ahead
             # and attempt to complete a future step
             # logger.info(f"{self.look_ahead}")
+            logger.info(f"are we going to look ahead? {self.look_ahead}")
             if self.look_ahead:
                 logger.info("in look_ahead")
                 index: int = 0
@@ -241,9 +247,11 @@ class BuildOrderRunner:
                         continue
                     index += 1
                     if step.start_condition():
-                        logger.info("DO WE GET HERE")
-                        self.current_step_started = False
-                        self._temporary_build_step = i
+                        
+                        if not self.performing_tmp_step:
+                            self._temporary_build_step = i
+                            
+                        # self.current_step_started = False
                         break
 
         if not self.build_completed and self.build_step >= len(self.build_order):
@@ -260,7 +268,7 @@ class BuildOrderRunner:
                 self.ai, self.config, self.mediator
             )
 
-    async def do_step(self, step: BuildOrderStep) -> None:
+    async def do_step(self, step: BuildOrderStep, tmp_build: bool) -> None:
         """
         Runs a specific build order step.
 
@@ -283,26 +291,22 @@ class BuildOrderRunner:
         logger.info(f"About to start step with info: {step}")
         start_at_supply: int = step.start_at_supply
         start_condition_triggered: bool = step.start_condition()
-        logger.info(f"do_step, supply at {start_at_supply}, start_con {start_condition_triggered}, start {self.current_step_started}")
 
-        if self._temporary_build_step != -1:
-            self.current_step_started = False
+        if self._temporary_build_step != -1 and not self.performing_tmp_step:
+            self.performing_tmp_step = True
             self._temporary_build_step = -1
+
+        logger.info(f"do_step, supply at {start_at_supply}, start_con {start_condition_triggered}, started? {self.current_step_started}")
 
         # start condition is active for a structure? reduce the supply threshold
         # this allows a worker to be sent earlier
-        if (
-            self.ai.race == Race.Protoss
-            and start_condition_triggered
-            and step.command in ALL_STRUCTURES
-            and step.command != UnitID.PYLON
-        ):
+        if (self.ai.race == Race.Protoss and start_condition_triggered
+            and step.command in ALL_STRUCTURES and step.command != UnitID.PYLON):
             start_at_supply -= 1
-        if (
-            start_condition_triggered
-            and not self.current_step_started
-            and self.ai.supply_used >= start_at_supply
-        ):
+
+        # Check build item start for normal order
+        if (start_condition_triggered and not self.current_step_started
+            and not tmp_build and self.ai.supply_used >= start_at_supply):
             
             command: UnitID = step.command
             if command in ADD_ONS:
@@ -335,6 +339,7 @@ class BuildOrderRunner:
                             ]:
                                 persistent_worker_available = True
                 logger.info(f"2")
+                # logger.info(f"persist worker? {persistent_worker_available}")
                 if worker := self.mediator.select_worker(
                     target_position=self.current_build_position,
                     force_close=True,
@@ -342,12 +347,22 @@ class BuildOrderRunner:
                     only_select_persistent_builder=persistent_worker_available,
                 ):
                     logger.info(f"3")
+                    logger.info(self.mediator.get_unit_role_dict)
                     if next_building_position := await self.get_position(
                         step.command, step.target
                     ):
                         logger.info(f"4")
                         self.current_build_position = next_building_position
-                        logger.info(f"{worker}, {command}, {self.current_build_position}, {worker.tag in self.mediator.get_unit_role_dict[UnitRole.GATHERING]}")
+                        # logger.info(f"{worker}, {command}, {self.current_build_position}, {worker.tag in self.mediator.get_unit_role_dict[UnitRole.GATHERING]}")
+                        # logger.info(f"location is {self.mediator.can_place_structure(position=self.current_build_position,
+                                                        # structure_type=command)}")
+                        # logger.info(f"{self.mediator.build_with_specific_worker(
+                        #     worker=worker,
+                        #     structure_type=command,
+                        #     pos=self.current_build_position,
+                        #     assign_role=worker.tag
+                        #     in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+                        # )}")
                         if self.mediator.build_with_specific_worker(
                             worker=worker,
                             structure_type=command,
@@ -355,8 +370,8 @@ class BuildOrderRunner:
                             assign_role=worker.tag
                             in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
                         ):
-                            logger.info(f"end for current_step {self.current_step_started}")
                             self.current_step_started = True
+                            logger.info(f"end for current_step {self.current_step_started}")
 
             elif isinstance(command, UnitID) and command not in ALL_STRUCTURES:
                 army_comp: dict = {command: {"proportion": 1.0, "priority": 0}}
@@ -427,7 +442,8 @@ class BuildOrderRunner:
                     )
                     self.current_step_started = True
 
-        if self.current_step_started:
+        # Check build step progress for normal order
+        if self.current_step_started and not tmp_build:
             if not self.current_step_complete:
                 self.current_step_complete = step.end_condition()
             # end condition hasn't yet activated
@@ -485,11 +501,358 @@ class BuildOrderRunner:
 
                 self.current_step_started = False
                 self.current_step_complete = False
+
                 if step.command == UnitID.PYLON:
                     self.mediator.switch_roles(
                         from_role=UnitRole.PERSISTENT_BUILDER,
                         to_role=UnitRole.GATHERING,
                     )
+
+        # Check build item start for tmp order
+        if (start_condition_triggered and tmp_build 
+            and not self.tmp_step_started 
+            and self.ai.supply_used >= start_at_supply):
+            
+            command: UnitID = step.command
+            if command in ADD_ONS:
+                self.tmp_step_started = True
+            elif command in ALL_STRUCTURES:
+                logger.info("entered the all_structures")
+                # let the gas steal preventer handle this step
+                if command in GAS_BUILDINGS and len(self._geyser_tag_to_probe_tag) > 0:
+                    self.tmp_step_started = True
+                    return
+
+                persistent_workers: Units = self.mediator.get_units_from_role(
+                    role=UnitRole.PERSISTENT_BUILDER
+                )
+                building_tracker: dict = self.mediator.get_building_tracker_dict
+                logger.info(f"1")
+                persistent_worker_available: bool = False
+                if self.persistent_worker:
+                    for worker in persistent_workers:
+                        if self.ai.race == Race.Protoss:
+                            persistent_worker_available = True
+                            break
+                        if worker.tag in building_tracker:
+                            target: Point2 = building_tracker[worker.tag][TARGET]
+                            if [
+                                s
+                                for s in self.ai.structures
+                                if cy_distance_to_squared(s.position, target) < 6
+                                and s.build_progress > 0.95
+                            ]:
+                                persistent_worker_available = True
+                logger.info(f"2")
+                # logger.info(f"persist worker? {persistent_worker_available}")
+                if worker := self.mediator.select_worker(
+                    target_position=self.current_build_position,
+                    force_close=True,
+                    select_persistent_builder=command != UnitID.REFINERY,
+                    only_select_persistent_builder=persistent_worker_available,
+                ):
+                    logger.info(f"3")
+                    logger.info(self.mediator.get_unit_role_dict)
+                    if next_building_position := await self.get_position(
+                        step.command, step.target
+                    ):
+                        logger.info(f"4")
+                        self.current_build_position = next_building_position
+                        # logger.info(f"{worker}, {command}, {self.current_build_position}, {worker.tag in self.mediator.get_unit_role_dict[UnitRole.GATHERING]}")
+                        # logger.info(f"location is {self.mediator.can_place_structure(position=self.current_build_position,
+                                                        # structure_type=command)}")
+                        # logger.info(f"{self.mediator.build_with_specific_worker(
+                        #     worker=worker,
+                        #     structure_type=command,
+                        #     pos=self.current_build_position,
+                        #     assign_role=worker.tag
+                        #     in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+                        # )}")
+                        if self.mediator.build_with_specific_worker(
+                            worker=worker,
+                            structure_type=command,
+                            pos=self.current_build_position,
+                            assign_role=worker.tag
+                            in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+                        ):
+                            self.tmp_step_started = True
+                            logger.info(f"end for current_step {self.tmp_step_started}")
+
+            elif isinstance(command, UnitID) and command not in ALL_STRUCTURES:
+                army_comp: dict = {command: {"proportion": 1.0, "priority": 0}}
+                spawn_target: Point2 = self._get_target(step.target)
+                did_spawn_action: bool = SpawnController(
+                    army_comp, freeflow_mode=True, maximum=1, spawn_target=spawn_target
+                ).execute(self.ai, self.config, self.mediator)
+                if did_spawn_action:
+                    if (
+                        UpgradeId.WARPGATERESEARCH in self.ai.state.upgrades
+                        and command in GATEWAY_UNITS
+                    ):
+                        # main.on_unit_created will set self.tmp_step_started = True
+                        pass
+                    else:
+                        self.tmp_step_started = True
+
+            elif isinstance(command, UpgradeId):
+                self.tmp_step_started = True
+                self.ai.research(command)
+
+            elif command == AbilityId.EFFECT_CHRONOBOOST:
+                if chrono_target := self.get_structure(step.target):
+                    if available_nexuses := [
+                        th
+                        for th in self.ai.townhalls
+                        if th.energy >= 50 and th.is_ready
+                    ]:
+                        available_nexuses[0](
+                            AbilityId.EFFECT_CHRONOBOOSTENERGYCOST, chrono_target
+                        )
+                        self.tmp_step_started = True
+
+            elif command == AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND:
+                if available_ccs := [
+                    th
+                    for th in self.ai.townhalls
+                    if th.is_idle and th.is_ready and th.type_id == UnitID.COMMANDCENTER
+                ]:
+                    available_ccs[0](AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
+                    self.tmp_step_started = True
+
+            elif command == BuildOrderOptions.WORKER_SCOUT:
+                if worker := self.mediator.select_worker(
+                    target_position=self.ai.start_location
+                ):
+                    worker.return_resource()
+                    for target in step.target:
+                        worker.move(target, queue=True)
+                    self.mediator.assign_role(
+                        tag=worker.tag, role=UnitRole.BUILD_RUNNER_SCOUT
+                    )
+                    self.tmp_step_started = True
+            elif command == BuildOrderOptions.OVERLORD_SCOUT:
+                unit_role_dict: dict[
+                    UnitRole, set[int]
+                ] = self.mediator.get_unit_role_dict
+                if overlords := [
+                    ol
+                    for ol in self.mediator.get_own_army_dict[UnitID.OVERLORD]
+                    if ol.tag not in unit_role_dict[UnitRole.BUILD_RUNNER_SCOUT]
+                ]:
+                    overlord: Unit = overlords[0]
+                    for i, target in enumerate(step.target):
+                        overlord.move(target, queue=i != 0)
+                    self.mediator.assign_role(
+                        tag=overlord.tag, role=UnitRole.BUILD_RUNNER_SCOUT
+                    )
+                    self.tmp_step_started = True
+
+        # Check build item progress for tmp order
+        if self.tmp_step_started and tmp_build:
+            if not self.tmp_step_completed:
+                self.tmp_step_completed = step.end_condition()
+            # end condition hasn't yet activated
+            if not self.tmp_step_completed:
+                command: Union[UnitID, UpgradeId] = step.command
+                # sometimes gas building didn't go through
+                # due to conflict with gas steal
+                if (
+                    command in GAS_BUILDINGS
+                    and len(self._geyser_tag_to_probe_tag) == 0
+                    and self.mediator.get_building_counter[command] == 0
+                ):
+                    if worker := self.mediator.select_worker(
+                        target_position=self.current_build_position, force_close=True
+                    ):
+                        if next_building_position := await self.get_position(
+                            step.command, step.target
+                        ):
+                            self.current_build_position = next_building_position
+                            self.mediator.build_with_specific_worker(
+                                worker=worker,
+                                structure_type=command,
+                                pos=self.current_build_position,
+                                assign_role=worker.tag
+                                in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+                            )
+                elif command in ADD_ONS and self.ai.can_afford(command):
+                    if base_structures := [
+                        s
+                        for s in self.ai.structures
+                        if s.is_ready and s.is_idle and s.type_id == ADD_ONS[command]
+                    ]:
+                        base_structures[0].build(command)
+                # should have already started upgraded when step started,
+                # backup here just in case
+                elif isinstance(command, UpgradeId):
+                    self.ai.research(command)
+                elif command == UnitID.ARCHON:
+                    army_comp: dict = {command: {"proportion": 1.0, "priority": 0}}
+                    SpawnController(army_comp, freeflow_mode=True, maximum=1).execute(
+                        self.ai, self.config, self.mediator
+                    )
+
+            # end condition active, complete step
+            else:
+                time: str = self.ai.time_formatted
+                logger.info(f"{self.ai.supply_used} {time} {step.command.name}")
+                if self._temporary_build_step != -1:
+                    self.build_order.remove(
+                        self.build_order[self._temporary_build_step]
+                    )
+                    self._temporary_build_step = -1
+                else:
+                    self.build_step += 1
+
+                self.tmp_step_started = False
+                self.tmp_step_completed = False
+                if self.performing_tmp_step:
+                    self.performing_tmp_step = False
+
+                if step.command == UnitID.PYLON:
+                    self.mediator.switch_roles(
+                        from_role=UnitRole.PERSISTENT_BUILDER,
+                        to_role=UnitRole.GATHERING,
+                    )
+
+
+    # async def start_step(self, start_condition_triggered: bool, step_started: bool, step: BuildOrderStep, supply_used: int, start_at_supply: int):
+    #     if (start_condition_triggered and not step_started
+    #         and supply_used >= start_at_supply):
+            
+    #         command: UnitID = step.command
+    #         if command in ADD_ONS:
+    #             step_started = True
+    #         elif command in ALL_STRUCTURES:
+    #             logger.info("entered the all_structures")
+    #             # let the gas steal preventer handle this step
+    #             if command in GAS_BUILDINGS and len(self._geyser_tag_to_probe_tag) > 0:
+    #                 step_started = True
+    #                 return
+
+    #             persistent_workers: Units = self.mediator.get_units_from_role(
+    #                 role=UnitRole.PERSISTENT_BUILDER
+    #             )
+    #             building_tracker: dict = self.mediator.get_building_tracker_dict
+    #             logger.info(f"1")
+    #             persistent_worker_available: bool = False
+    #             if self.persistent_worker:
+    #                 for worker in persistent_workers:
+    #                     if self.ai.race == Race.Protoss:
+    #                         persistent_worker_available = True
+    #                         break
+    #                     if worker.tag in building_tracker:
+    #                         target: Point2 = building_tracker[worker.tag][TARGET]
+    #                         if [
+    #                             s
+    #                             for s in self.ai.structures
+    #                             if cy_distance_to_squared(s.position, target) < 6
+    #                             and s.build_progress > 0.95
+    #                         ]:
+    #                             persistent_worker_available = True
+    #             logger.info(f"2")
+    #             # logger.info(f"persist worker? {persistent_worker_available}")
+    #             if worker := self.mediator.select_worker(
+    #                 target_position=self.current_build_position,
+    #                 force_close=True,
+    #                 select_persistent_builder=command != UnitID.REFINERY,
+    #                 only_select_persistent_builder=persistent_worker_available,
+    #             ):
+    #                 logger.info(f"3")
+    #                 logger.info(self.mediator.get_unit_role_dict)
+    #                 if next_building_position := await self.get_position(
+    #                     step.command, step.target
+    #                 ):
+    #                     logger.info(f"4")
+    #                     self.current_build_position = next_building_position
+    #                     # logger.info(f"{worker}, {command}, {self.current_build_position}, {worker.tag in self.mediator.get_unit_role_dict[UnitRole.GATHERING]}")
+    #                     # logger.info(f"location is {self.mediator.can_place_structure(position=self.current_build_position,
+    #                                                     # structure_type=command)}")
+    #                     # logger.info(f"{self.mediator.build_with_specific_worker(
+    #                     #     worker=worker,
+    #                     #     structure_type=command,
+    #                     #     pos=self.current_build_position,
+    #                     #     assign_role=worker.tag
+    #                     #     in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+    #                     # )}")
+    #                     if self.mediator.build_with_specific_worker(
+    #                         worker=worker,
+    #                         structure_type=command,
+    #                         pos=self.current_build_position,
+    #                         assign_role=worker.tag
+    #                         in self.mediator.get_unit_role_dict[UnitRole.GATHERING],
+    #                     ):
+    #                         step_started = True
+    #                         logger.info(f"end for current_step {step_started}")
+
+    #         elif isinstance(command, UnitID) and command not in ALL_STRUCTURES:
+    #             army_comp: dict = {command: {"proportion": 1.0, "priority": 0}}
+    #             spawn_target: Point2 = self._get_target(step.target)
+    #             did_spawn_action: bool = SpawnController(
+    #                 army_comp, freeflow_mode=True, maximum=1, spawn_target=spawn_target
+    #             ).execute(self.ai, self.config, self.mediator)
+    #             if did_spawn_action:
+    #                 if (
+    #                     UpgradeId.WARPGATERESEARCH in self.ai.state.upgrades
+    #                     and command in GATEWAY_UNITS
+    #                 ):
+    #                     # main.on_unit_created will set step_started = True
+    #                     pass
+    #                 else:
+    #                     step_started = True
+
+    #         elif isinstance(command, UpgradeId):
+    #             step_started = True
+    #             self.ai.research(command)
+
+    #         elif command == AbilityId.EFFECT_CHRONOBOOST:
+    #             if chrono_target := self.get_structure(step.target):
+    #                 if available_nexuses := [
+    #                     th
+    #                     for th in self.ai.townhalls
+    #                     if th.energy >= 50 and th.is_ready
+    #                 ]:
+    #                     available_nexuses[0](
+    #                         AbilityId.EFFECT_CHRONOBOOSTENERGYCOST, chrono_target
+    #                     )
+    #                     step_started = True
+
+    #         elif command == AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND:
+    #             if available_ccs := [
+    #                 th
+    #                 for th in self.ai.townhalls
+    #                 if th.is_idle and th.is_ready and th.type_id == UnitID.COMMANDCENTER
+    #             ]:
+    #                 available_ccs[0](AbilityId.UPGRADETOORBITAL_ORBITALCOMMAND)
+    #                 step_started = True
+
+    #         elif command == BuildOrderOptions.WORKER_SCOUT:
+    #             if worker := self.mediator.select_worker(
+    #                 target_position=self.ai.start_location
+    #             ):
+    #                 worker.return_resource()
+    #                 for target in step.target:
+    #                     worker.move(target, queue=True)
+    #                 self.mediator.assign_role(
+    #                     tag=worker.tag, role=UnitRole.BUILD_RUNNER_SCOUT
+    #                 )
+    #                 step_started = True
+    #         elif command == BuildOrderOptions.OVERLORD_SCOUT:
+    #             unit_role_dict: dict[
+    #                 UnitRole, set[int]
+    #             ] = self.mediator.get_unit_role_dict
+    #             if overlords := [
+    #                 ol
+    #                 for ol in self.mediator.get_own_army_dict[UnitID.OVERLORD]
+    #                 if ol.tag not in unit_role_dict[UnitRole.BUILD_RUNNER_SCOUT]
+    #             ]:
+    #                 overlord: Unit = overlords[0]
+    #                 for i, target in enumerate(step.target):
+    #                     overlord.move(target, queue=i != 0)
+    #                 self.mediator.assign_role(
+    #                     tag=overlord.tag, role=UnitRole.BUILD_RUNNER_SCOUT
+    #                 )
+    #                 step_started = True
 
     async def get_position(
         self, structure_type: UnitID, target: Optional[str]

@@ -1,3 +1,8 @@
+# Ares-sc2 files
+ares-sc2/.flake8
+ares-sc2/.github/
+ares-sc2/.gitignore
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

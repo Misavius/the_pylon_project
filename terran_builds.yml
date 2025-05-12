@@ -49,6 +49,7 @@ BuildChoices:
 Builds:
     hard_tank_contain:
         # Build constant workers till x supply
+        PersistentWorker: False
         ConstantWorkerProductionTill: 24
         OpeningBuildOrder:
             # Example: ['12 worker', '13 worker', '14 supply', '14 worker', '15 chrono @ nexus',
@@ -57,12 +58,12 @@ Builds:
             #     '15 worker', '16 bunker @ ENEMY_NAT_VISION', '16 worker', '16 refinery', '17 worker', '17 orbital',
             #     '18 worker', '19 worker', '19 factory', '20 worker', '20 supply', '21 worker', '22 factorytechlab',
             #     '22 worker', '23 worker', '24 worker', '25 siegetank']
-            # ['12 barracks @ enemy_third', '13 supply @ ramp', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
+            ['12 barracks @ enemy_third', '13 supply @ ramp', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
+                '17 factory', '17 orbital', '16 marine', '17 supply', '19 marine', '20 factorytechlab',  '21 marine',
+                '25 siegetank']
+            # ['13 supply @ ramp', '13 barracks @ enemy_third', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
             #     '17 factory', '17 orbital', '17 marine', '17 supply', '19 marine', '20 factorytechlab',  '21 marine',
             #     '25 siegetank']
-            ['13 supply @ ramp', '13 barracks @ enemy_third', '15 refinery', '15 bunker @ ENEMY_NAT_VISION', '15 marine',
-                '17 factory', '17 orbital', '17 marine', '17 supply', '19 marine', '20 factorytechlab',  '21 marine',
-                '25 siegetank']
             
 
 
